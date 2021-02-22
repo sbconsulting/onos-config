@@ -84,6 +84,7 @@ func (r *Reconciler) Reconcile(id types.ID) (controller.Result, error) {
 
 	// The device controller only needs to handle changes in the RUNNING state
 	if change == nil || change.Status.Incarnation == 0 || change.Status.State != changetypes.State_PENDING {
+		log.Infof("DeviceChange %v returning because not running", change)
 		return controller.Result{}, nil
 	}
 
@@ -224,6 +225,7 @@ func (r *Reconciler) computeRollback(deviceChange *devicechange.DeviceChange) (*
 			if prevVal.Path == rbValue.Path ||
 				rbValue.Removed && strings.HasPrefix(prevVal.Path, rbValue.Path) {
 				alreadyUpdated[rbValue.Path] = struct{}{}
+				log.Infof("XXX apply previousValue %v, %v", prevVal.Path, prevVal.Value)
 				previousValues = append(previousValues, &devicechange.ChangeValue{
 					Path:  prevVal.Path,
 					Value: prevVal.Value,
@@ -231,6 +233,7 @@ func (r *Reconciler) computeRollback(deviceChange *devicechange.DeviceChange) (*
 			}
 		}
 		if _, ok := alreadyUpdated[rbValue.Path]; !ok {
+			log.Infof("XXX removed previousValue %v", rbValue.Path)
 			previousValues = append(previousValues, &devicechange.ChangeValue{
 				Path:    rbValue.Path,
 				Removed: true,

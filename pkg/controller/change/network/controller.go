@@ -77,8 +77,10 @@ func (r *Reconciler) Reconcile(id types.ID) (controller.Result, error) {
 	if change != nil {
 		switch change.Status.Phase {
 		case changetypes.Phase_CHANGE:
+			log.Infof("Phase_CHANGE")
 			return r.reconcileChange(change)
 		case changetypes.Phase_ROLLBACK:
+			log.Infof("Phase_Rollback")
 			return r.reconcileRollback(change)
 		}
 	}
@@ -132,6 +134,7 @@ func (r *Reconciler) reconcilePendingChange(change *networkchange.NetworkChange)
 
 	// If all device changes are complete, complete the network change
 	if r.isDeviceChangesComplete(change, deviceChanges) {
+		log.Infof("isDevicechangesComplete = true")
 		change.Status.State = changetypes.State_COMPLETE
 		log.Infof("Completing NetworkChange %v", change)
 		if err := r.networkChanges.Update(change); err != nil {
@@ -142,6 +145,15 @@ func (r *Reconciler) reconcilePendingChange(change *networkchange.NetworkChange)
 
 	// If any device change has failed, roll back all device changes
 	if r.isDeviceChangesFailed(change, deviceChanges) {
+		log.Infof("isDeviceChangesFailed = true")
+
+		// XXX smbaker change the networkchange state to rollback
+		// otherwise it will flop all the device changes back to pending and loop
+		change.Status.Phase = changetypes.Phase_ROLLBACK
+		if err := r.networkChanges.Update(change); err != nil {
+			return controller.Result{}, err
+		}
+
 		return r.ensureDeviceChangeRollbacks(change, deviceChanges)
 	}
 	return controller.Result{}, nil
@@ -278,6 +290,9 @@ func (r *Reconciler) ensureDeviceChangesPending(networkChange *networkchange.Net
 	for _, deviceChange := range changes {
 		if deviceChange.Status.Incarnation < networkChange.Status.Incarnation {
 			deviceChange.Status.Incarnation = networkChange.Status.Incarnation
+			if deviceChange.Status.Phase == changetypes.Phase_ROLLBACK {
+				log.Infof("Changing deviceChange %v from ROLLBACK to CHANGE", deviceChange.ID)
+			}
 			deviceChange.Status.Phase = changetypes.Phase_CHANGE
 			deviceChange.Status.State = changetypes.State_PENDING
 			deviceChange.Status.Reason = changetypes.Reason_NONE

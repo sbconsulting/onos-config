@@ -244,6 +244,7 @@ func (c *Controller) partition(id types.ID, partitioner WorkPartitioner) {
 				}
 				c.mu.Unlock()
 			}
+			log.Infof("ZZZ controller %s-%p write id to partition %v", c.name, c, id)
 			partition <- id
 			return
 		}
@@ -257,11 +258,15 @@ func (c *Controller) processRequests(ch chan types.ID) {
 	reconciler := c.reconciler
 	c.mu.RUnlock()
 
+	log.Infof("ZZZ processRequests called")
+
 	for id := range ch {
+		log.Infof("ZZZ controller %s-%p processRequests reconcile %v", c.name, c, id)
 		// Reconcile the request. If the reconciliation is not successful, requeue the request to be processed
 		// after the remaining enqueued events.
 		result := c.reconcile(id, reconciler)
 		if result.Requeue != "" {
+			log.Infof("ZZZ Requeue %v", id)
 			go c.requeueRequest(ch, result.Requeue)
 		}
 	}
@@ -269,6 +274,7 @@ func (c *Controller) processRequests(ch chan types.ID) {
 
 // requeueRequest requeues the given request
 func (c *Controller) requeueRequest(ch chan types.ID, id types.ID) {
+	log.Infof("ZZZ controller %s-%p requeueRequest %v", c.name, c, id)
 	ch <- id
 }
 
@@ -292,6 +298,7 @@ func (c *Controller) reconcile(id types.ID, reconciler Reconciler) Result {
 	}
 
 	err = backoff.RetryNotify(func() error {
+		log.Infof("ZZZ Controller %s-%p backoff reconcile %v", c.name, c, id)
 		result, err = reconciler.Reconcile(id)
 		if err != nil {
 			return err
